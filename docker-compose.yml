@@ -1,0 +1,73 @@
+version: '3.5'
+
+services:
+  docker-dina-web:
+    container_name: docker-dina-web
+    build:
+      context: ./docker/nginx
+      args:
+        UID: $U_ID
+    ports:
+      - 400:80
+    volumes:
+      - ./public:/appdata/www/public
+    networks:
+      - docker-dina-network
+    depends_on:
+      - docker-dina-be
+
+  docker-dina-be:
+    container_name: docker-dina-be
+    build:
+      context: ./docker/php
+      args:
+        UID: $U_ID
+    environment:
+      PHP_IDE_CONFIG: serverName=docker-dina-be
+      PHP_XDEBUG_ENABLED: 1
+      XDEBUG_CONFIG: remote_host=172.17.0.1 remote_port=9003 # Linux users
+#      XDEBUG_CONFIG: remote_host=host.docker.internal remote_port=9005 # MacOS users
+    volumes:
+      - ./:/appdata/www
+      - ./docker/php/xdebug-linux.ini:/usr/local/etc/php/conf.d/xdebug.ini # Linux users
+#    - ./docker/php/xdebug-macos.ini:/usr/local/etc/php/conf.d/xdebug.ini # MacOS users
+      - ~/.ssh/id_rsa:/home/appuser/.ssh/id_rsa
+    env_file:
+      - .env
+    networks:
+      - docker-dina-network
+    depends_on:
+      - docker-dina-db
+
+  docker-dina-db:
+    container_name: docker-dina-db
+    image: mysql:8.0
+    ports:
+      - 40000:3306
+    environment:
+      MYSQL_DATABASE: docker_dina_database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_ROOT_PASSWORD: root
+    command: mysqld --sql_mode="STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION"
+    volumes:
+      - docker-dina-database-data:/var/lib/mysql
+    networks:
+      - docker-dina-network
+  redis:
+    container_name: docker-redis
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - docker-dina-network
+
+volumes:
+  docker-dina-database-data:
+  redis-data:
+
+networks:
+  docker-dina-network:
+    external: true
